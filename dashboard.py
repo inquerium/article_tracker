@@ -5,8 +5,10 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import json
 
-from article_tracker_simple import ArticleTracker
-from config import DB_CONNECTION, EXPORT_DIR, DEPARTMENTS
+try:
+    from config_cloud import DB_CONNECTION, EXPORT_DIR, DEPARTMENTS
+except ImportError:
+    from config import DB_CONNECTION, EXPORT_DIR, DEPARTMENTS
 
 # Initialize the tracker
 @st.cache_resource
