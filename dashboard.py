@@ -326,7 +326,7 @@ def display_article_submission_form():
     st.title("Submit New Article")
     
     # Reset button
-    if st.sidebar.button("New Article"):
+    if st.sidebar.button("Reset Form"):
         # Only set the session state if it hasn't been set already
         if st.session_state.get("reset_clicked") != True:
             # Clear form-related session state
@@ -338,11 +338,11 @@ def display_article_submission_form():
             # Set to step 1
             st.session_state.submission_step = 1
             
-            # Mark that we've processed this reset
-            st.session_state.reset_clicked = True
-            
             # Rerun to refresh
             st.experimental_rerun()
+            
+            # Mark that we've processed this reset
+            st.session_state.reset_clicked = True
     else:
         # Reset flag when button is not clicked
         if "reset_clicked" in st.session_state:
