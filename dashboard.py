@@ -334,6 +334,7 @@ def display_article_submission_form():
         
         # Set back to step 1
         st.session_state.submission_step = 1
+        st.experimental_rerun()
         
     
     # Step 1: Article Information Form
