@@ -256,10 +256,11 @@ def get_trending_keywords(days=30, limit=20):
         conn = get_conn()
         cur = conn.cursor()
         
+        # Fix the interval syntax here
         cur.execute("""
         SELECT keyword, COUNT(*) as count
         FROM articles, unnest(keywords) as keyword
-        WHERE publish_date >= NOW() - INTERVAL %s DAY
+        WHERE publish_date >= NOW() - INTERVAL '%s days'
         GROUP BY keyword
         ORDER BY count DESC
         LIMIT %s
