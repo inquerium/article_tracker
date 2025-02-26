@@ -50,4 +50,4 @@ exports/
 
 # Config files with sensitive info
 config.py
-.streamlit/secrets.toml
+#.streamlit/secrets.toml
