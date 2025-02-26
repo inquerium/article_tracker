@@ -328,7 +328,6 @@ def display_article_submission_form():
     # Reset button
     if st.sidebar.button("Reset Form"):
         st.session_state.submission_step = 1
-        st.experimental_rerun()
     
     # Step 1: Article Information Form
     if st.session_state.submission_step == 1:
