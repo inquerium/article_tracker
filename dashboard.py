@@ -327,7 +327,14 @@ def display_article_submission_form():
     
     # Reset button
     if st.sidebar.button("Reset Form"):
+        # Clear all form-related session state variables
+        for key in list(st.session_state.keys()):
+            if key in ['submission_step', 'article_data', 'duplicate_result']:
+                del st.session_state[key]
+        
+        # Set back to step 1
         st.session_state.submission_step = 1
+        
     
     # Step 1: Article Information Form
     if st.session_state.submission_step == 1:
