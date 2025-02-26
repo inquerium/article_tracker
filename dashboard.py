@@ -325,28 +325,7 @@ def main():
 def display_article_submission_form():
     st.title("Submit New Article")
     
-    '''# Reset button
-    if st.sidebar.button("Reset Form"):
-        # Only set the session state if it hasn't been set already
-        if st.session_state.get("reset_clicked") != True:
-            # Clear form-related session state
-            keys_to_delete = ['article_data', 'duplicate_result']
-            for key in keys_to_delete:
-                if key in st.session_state:
-                    del st.session_state[key]
-            
-            # Set to step 1
-            st.session_state.submission_step = 1
-            
-            # Rerun to refresh
-            st.experimental_rerun()
-            
-            # Mark that we've processed this reset
-            st.session_state.reset_clicked = True
-    else:
-        # Reset flag when button is not clicked
-        if "reset_clicked" in st.session_state:
-            del st.session_state.reset_clicked'''
+    # Eventually place reset button here
         
     
     # Step 1: Article Information Form
