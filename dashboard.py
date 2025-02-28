@@ -238,7 +238,7 @@ def search_articles(query, limit=100):
         engine = create_engine(DB_CONNECTION)
         
         sql_query = f"""
-        SELECT id, title, author, publish_date, content, ts_rank(document_vector, to_tsquery('english', %s)) AS relevance
+        SELECT id, title, author, publish_date, content, keywords, ts_rank(document_vector, to_tsquery('english', %s)) AS relevance
         FROM articles
         WHERE document_vector @@ to_tsquery('english', %s)
         ORDER BY relevance DESC
