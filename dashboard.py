@@ -538,25 +538,32 @@ def display_recent_articles():
             # Format dates
             df['publish_date'] = pd.to_datetime(df['publish_date']).dt.strftime('%Y-%m-%d')
             
-            # Make the dataframe interactive with selection
-            selected_indices = st.dataframe(
+            # Display the dataframe
+            st.dataframe(
                 df[['id', 'title', 'author', 'department', 'publish_date', 'keywords']],
                 use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "id": st.column_config.NumberColumn("ID", width="small"),
-                    "title": st.column_config.TextColumn("Title", width="large"),
-                    "keywords": st.column_config.TextColumn("Keywords", width="medium"),
-                },
-                selection="single"  # Enable single row selection
+                hide_index=True
             )
             
-            # Show content of selected article
-            if selected_indices:
-                selected_idx = selected_indices.rows[0]
-                selected_article = df.iloc[selected_idx]
+            # Alternative approach: Select article to view
+            article_ids = df['id'].tolist()
+            article_titles = df['title'].tolist()
+            
+            # Create selection options
+            article_options = [f"{id}: {title}" for id, title in zip(article_ids, article_titles)]
+            
+            selected_article_option = st.selectbox(
+                "Select an article to view full content:", 
+                [""] + article_options,
+                index=0
+            )
+            
+            # Show content if an article is selected
+            if selected_article_option:
+                article_id = int(selected_article_option.split(":")[0])
+                selected_article = df[df['id'] == article_id].iloc[0]
                 
-                with st.expander(f"Article Content: {selected_article['title']}", expanded=True):
+                with st.expander(f"Article Content", expanded=True):
                     st.markdown("### " + selected_article['title'])
                     st.markdown(f"**Author:** {selected_article['author']} | **Department:** {selected_article['department']} | **Date:** {selected_article['publish_date']}")
                     st.markdown(f"**Keywords:** {selected_article['keywords']}")
