@@ -232,21 +232,61 @@ def get_recent_articles(days=30, department=None, limit=100):
         st.error(f"Database error: {e}")
         return pd.DataFrame()
 
-def search_articles(query, limit=100):
-    """Search articles using full-text search"""
+def search_articles(query, limit=100, min_relevance=0.15):
+    """
+    Search articles using full-text search with improved relevance scoring
+    
+    Args:
+        query (str): Search terms
+        limit (int): Maximum number of results
+        min_relevance (float): Minimum relevance score (0-1)
+    """
     try:
         engine = create_engine(DB_CONNECTION)
         
-        sql_query = f"""
-        SELECT id, title, author, publish_date, content, keywords, department, ts_rank(document_vector, to_tsquery('english', %s)) AS relevance
+        # Use different weights for different columns
+        # A, B, C, D are weight factors (A highest)
+        # A = title (highest weight)
+        # B = keywords
+        # C = content 
+        # D = author/department (lowest weight)
+        sql_query = """
+        SELECT 
+            id, 
+            title, 
+            author, 
+            publish_date, 
+            content, 
+            department, 
+            keywords,
+            ts_rank_cd(
+                setweight(to_tsvector('english', title), 'A') ||
+                setweight(to_tsvector('english', coalesce(array_to_string(keywords, ' '), '')), 'B') ||
+                setweight(to_tsvector('english', content), 'C') ||
+                setweight(to_tsvector('english', author || ' ' || coalesce(department, '')), 'D'),
+                to_tsquery('english', %s)
+            ) AS relevance
         FROM articles
-        WHERE document_vector @@ to_tsquery('english', %s)
+        WHERE 
+            to_tsvector('english', title) @@ to_tsquery('english', %s) OR
+            to_tsvector('english', coalesce(array_to_string(keywords, ' '), '')) @@ to_tsquery('english', %s) OR
+            to_tsvector('english', content) @@ to_tsquery('english', %s) OR
+            to_tsvector('english', author || ' ' || coalesce(department, '')) @@ to_tsquery('english', %s)
         ORDER BY relevance DESC
-        LIMIT {limit}
         """
         
-        df = pd.read_sql_query(sql_query, engine, params=(query, query))
-        return df
+        # Convert the min_relevance to a score that makes sense with ts_rank_cd
+        # The scores are typically between 0 and 1
+        
+        # Execute query and get all results
+        df = pd.read_sql_query(sql_query, engine, params=(query, query, query, query, query))
+        
+        # Filter for minimum relevance
+        df = df[df['relevance'] >= min_relevance]
+        
+        # Take top results
+        return df.head(limit)
+        
     except Exception as e:
         st.error(f"Search error: {e}")
         return pd.DataFrame()
@@ -589,42 +629,63 @@ def display_search():
     st.title("Search Articles")
     
     # Search form
-    search_query = st.text_input("Enter search terms", help="Search articles by content, title, or keywords")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        search_query = st.text_input("Enter search terms", help="Search articles by content, title, or keywords")
+    with col2:
+        min_relevance = st.slider("Min Relevance", 0.0, 1.0, 0.15, 0.05)
     
     if search_query:
-        # Convert spaces to PostgreSQL full-text search format
-        formatted_query = search_query.replace(' ', ' & ')
+        # Format query for PostgreSQL
+        formatted_query = ' & '.join(search_query.split())
         
         with st.spinner("Searching..."):
-            df = search_articles(formatted_query)
+            df = search_articles(formatted_query, limit=10, min_relevance=min_relevance)
         
         if not df.empty:
-            # Format dates and keywords
+            # Format dates
             df['publish_date'] = pd.to_datetime(df['publish_date']).dt.strftime('%Y-%m-%d')
-            df['keywords'] = df['keywords'].apply(lambda x: ', '.join(x) if x else '')
+            
+            # Format keywords
+            if 'keywords' in df.columns:
+                df['keywords'] = df['keywords'].apply(lambda x: ', '.join(x) if x else '')
             
             # Show results count
-            st.success(f"Found {len(df)} results")
+            st.success(f"Found {len(df)} results with relevance ≥ {min_relevance:.2f}")
             
-            # Display results in tabs
+            # Display results in expandable sections
             for i, row in df.iterrows():
-                with st.expander(f"{row['title']} (Relevance: {row['relevance']:.2f})", expanded=i==0):
-                    st.markdown(f"**Author:** {row['author']} | **Department:** {row['department']} | **Date:** {row['publish_date']}")
-                    st.markdown(f"**Keywords:** {row['keywords']}")
+                # Calculate percentage relevance for display
+                relevance_pct = min(row['relevance'] * 100, 100)  # Cap at 100%
+                
+                with st.expander(f"{row['title']} (Relevance: {relevance_pct:.1f}%)", expanded=i==0):
+                    # Header with metadata
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.markdown(f"**Author:** {row['author']} | **Date:** {row['publish_date']}")
+                        if 'department' in df.columns:
+                            st.markdown(f"**Department:** {row['department']}")
+                    with col2:
+                        # Visual indicator of relevance
+                        st.progress(row['relevance'])
+                    
+                    # Keywords
+                    if 'keywords' in df.columns:
+                        st.markdown(f"**Keywords:** {row['keywords']}")
+                    
                     st.markdown("---")
                     
-                    # Display highlights of where the search terms appear in content
-                    content = row['content']
-                    
-                    # Simple highlighting of search terms
-                    terms = search_query.split()
-                    highlighted_content = content
-                    for term in terms:
-                        # Create a pattern that matches whole words ignoring case
-                        pattern = re.compile(r'\b' + re.escape(term) + r'\b', re.IGNORECASE)
-                        highlighted_content = pattern.sub(f"**{term}**", highlighted_content)
-                    
-                    st.markdown(highlighted_content)
+                    # Content
+                    if 'content' in df.columns:
+                        # Highlight search terms
+                        content = row['content']
+                        terms = search_query.split()
+                        for term in terms:
+                            if len(term) > 2:  # Only highlight terms with 3+ characters
+                                pattern = re.compile(r'\b' + re.escape(term) + r'\b', re.IGNORECASE)
+                                content = pattern.sub(f"**{term}**", content)
+                        
+                        st.markdown(content)
             
             # Download option
             csv = df.to_csv(index=False)
@@ -636,7 +697,7 @@ def display_search():
                 key='download-search'
             )
         else:
-            st.info("No articles found matching your search terms.")
+            st.info(f"No articles found with relevance ≥ {min_relevance:.2f}. Try lowering the minimum relevance or using different search terms.")
 
 def display_keyword_analysis():
     st.title("Keyword Analysis")
