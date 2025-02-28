@@ -209,7 +209,7 @@ def get_recent_articles(days=30, department=None, limit=100):
         
         if department and department != "All":
             query = f"""
-            SELECT id, title, author, department, publish_date, keywords
+            SELECT id, title, author, department, publish_date, keywords, content
             FROM articles
             WHERE publish_date >= NOW() - INTERVAL '{days} days'
             AND department = '{department}'
@@ -218,7 +218,7 @@ def get_recent_articles(days=30, department=None, limit=100):
             """
         else:
             query = f"""
-            SELECT id, title, author, department, publish_date, keywords
+            SELECT id, title, author, department, publish_date, keywords, content
             FROM articles
             WHERE publish_date >= NOW() - INTERVAL '{days} days'
             ORDER BY publish_date DESC 
@@ -523,6 +523,7 @@ def display_recent_articles():
     
     # Get recent articles
     try:
+        # Make sure to include content in the query
         df = get_recent_articles(days=days, department=department_filter if department_filter != "All" else None)
         
         # Apply title filter if provided
@@ -537,12 +538,30 @@ def display_recent_articles():
             # Format dates
             df['publish_date'] = pd.to_datetime(df['publish_date']).dt.strftime('%Y-%m-%d')
             
-            # Show the articles
-            st.dataframe(
+            # Make the dataframe interactive with selection
+            selected_indices = st.dataframe(
                 df[['id', 'title', 'author', 'department', 'publish_date', 'keywords']],
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                column_config={
+                    "id": st.column_config.NumberColumn("ID", width="small"),
+                    "title": st.column_config.TextColumn("Title", width="large"),
+                    "keywords": st.column_config.TextColumn("Keywords", width="medium"),
+                },
+                selection="single"  # Enable single row selection
             )
+            
+            # Show content of selected article
+            if selected_indices:
+                selected_idx = selected_indices.rows[0]
+                selected_article = df.iloc[selected_idx]
+                
+                with st.expander(f"Article Content: {selected_article['title']}", expanded=True):
+                    st.markdown("### " + selected_article['title'])
+                    st.markdown(f"**Author:** {selected_article['author']} | **Department:** {selected_article['department']} | **Date:** {selected_article['publish_date']}")
+                    st.markdown(f"**Keywords:** {selected_article['keywords']}")
+                    st.markdown("---")
+                    st.markdown(selected_article['content'])
             
             # Download option
             csv = df.to_csv(index=False)
