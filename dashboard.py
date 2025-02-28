@@ -655,10 +655,10 @@ def display_search():
             
             # Display results in expandable sections
             for i, row in df.iterrows():
-                # Calculate percentage relevance for display
-                relevance_pct = min(row['relevance'] * 100, 100)  # Cap at 100%
+                # Normalize relevance to 0-1 range for progress bar
+                normalized_relevance = min(row['relevance'] / 10.0, 1.0)  # Divide by 10 and cap at 1.0
                 
-                with st.expander(f"{row['title']} (Relevance: {relevance_pct:.1f}%)", expanded=i==0):
+                with st.expander(f"{row['title']} (Relevance score: {row['relevance']:.2f})", expanded=i==0):
                     # Header with metadata
                     col1, col2 = st.columns([3, 1])
                     with col1:
@@ -667,7 +667,7 @@ def display_search():
                             st.markdown(f"**Department:** {row['department']}")
                     with col2:
                         # Visual indicator of relevance
-                        st.progress(row['relevance'])
+                        st.progress(normalized_relevance)
                     
                     # Keywords
                     if 'keywords' in df.columns:
@@ -686,19 +686,8 @@ def display_search():
                                 content = pattern.sub(f"**{term}**", content)
                         
                         st.markdown(content)
-            
-            # Download option
-            csv = df.to_csv(index=False)
-            st.download_button(
-                "Download Results as CSV",
-                csv,
-                "search_results.csv",
-                "text/csv",
-                key='download-search'
-            )
-        else:
-            st.info(f"No articles found with relevance ≥ {min_relevance:.2f}. Try lowering the minimum relevance or using different search terms.")
-
+                        
+                        
 def display_keyword_analysis():
     st.title("Keyword Analysis")
     
