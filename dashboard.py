@@ -8,6 +8,7 @@ import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import hashlib
+import re  # For regex pattern matching in search highlighting
 import plotly.express as px
 
 # Download NLTK resources
@@ -237,7 +238,7 @@ def search_articles(query, limit=100):
         engine = create_engine(DB_CONNECTION)
         
         sql_query = f"""
-        SELECT id, title, author, publish_date, ts_rank(document_vector, to_tsquery('english', %s)) AS relevance
+        SELECT id, title, author, publish_date, content, ts_rank(document_vector, to_tsquery('english', %s)) AS relevance
         FROM articles
         WHERE document_vector @@ to_tsquery('english', %s)
         ORDER BY relevance DESC
@@ -591,16 +592,49 @@ def display_search():
     search_query = st.text_input("Enter search terms", help="Search articles by content, title, or keywords")
     
     if search_query:
+        # Convert spaces to PostgreSQL full-text search format
+        formatted_query = search_query.replace(' ', ' & ')
+        
         with st.spinner("Searching..."):
-            df = search_articles(search_query.replace(' ', ' & '))
+            df = search_articles(formatted_query)
         
         if not df.empty:
-            # Format dates
+            # Format dates and keywords
             df['publish_date'] = pd.to_datetime(df['publish_date']).dt.strftime('%Y-%m-%d')
+            df['keywords'] = df['keywords'].apply(lambda x: ', '.join(x) if x else '')
             
-            # Show results
+            # Show results count
             st.success(f"Found {len(df)} results")
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            
+            # Display results in tabs
+            for i, row in df.iterrows():
+                with st.expander(f"{row['title']} (Relevance: {row['relevance']:.2f})", expanded=i==0):
+                    st.markdown(f"**Author:** {row['author']} | **Department:** {row['department']} | **Date:** {row['publish_date']}")
+                    st.markdown(f"**Keywords:** {row['keywords']}")
+                    st.markdown("---")
+                    
+                    # Display highlights of where the search terms appear in content
+                    content = row['content']
+                    
+                    # Simple highlighting of search terms
+                    terms = search_query.split()
+                    highlighted_content = content
+                    for term in terms:
+                        # Create a pattern that matches whole words ignoring case
+                        pattern = re.compile(r'\b' + re.escape(term) + r'\b', re.IGNORECASE)
+                        highlighted_content = pattern.sub(f"**{term}**", highlighted_content)
+                    
+                    st.markdown(highlighted_content)
+            
+            # Download option
+            csv = df.to_csv(index=False)
+            st.download_button(
+                "Download Results as CSV",
+                csv,
+                "search_results.csv",
+                "text/csv",
+                key='download-search'
+            )
         else:
             st.info("No articles found matching your search terms.")
 
